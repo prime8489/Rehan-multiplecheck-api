@@ -7,6 +7,11 @@ app.use(express.json());
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
+// Default route to check if API is running
+app.get("/", (req, res) => {
+    res.send("API is running successfully!");
+});
+
 app.get("/check-membership", async (req, res) => {
     const { user_id, chat_id } = req.query;
 
@@ -14,7 +19,7 @@ app.get("/check-membership", async (req, res) => {
         return res.json({ status: "error", message: "User ID and Chat ID are required" });
     }
 
-    const channels = JSON.parse(decodeURIComponent(chat_id)); // चैनल लिस्ट को JSON में बदलें
+    const channels = JSON.parse(decodeURIComponent(chat_id)); // Convert channel list to JSON
     let notJoinedChannels = [];
 
     try {
