@@ -7,11 +7,6 @@ app.use(express.json());
 
 const BOT_TOKEN = process.env.BOT_TOKEN;
 
-// Default route to check if API is running
-app.get("/", (req, res) => {
-    res.send("API is running successfully!");
-});
-
 app.get("/check-membership", async (req, res) => {
     const { user_id, chat_id } = req.query;
 
@@ -19,20 +14,23 @@ app.get("/check-membership", async (req, res) => {
         return res.json({ status: "error", message: "User ID and Chat ID are required" });
     }
 
-    const channels = JSON.parse(decodeURIComponent(chat_id)); // Convert channel list to JSON
+    const channels = JSON.parse(decodeURIComponent(chat_id));
     let notJoinedChannels = [];
 
     try {
-        for (let channel of channels) {
-            let response = await axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMember`, {
+        // **Parallel Requests using Promise.all**
+        let checkPromises = channels.map(channel =>
+            axios.get(`https://api.telegram.org/bot${BOT_TOKEN}/getChatMember`, {
                 params: { chat_id: channel, user_id: user_id }
-            });
+            }).then(response => {
+                let status = response.data.result.status;
+                if (status === "left" || status === "kicked") {
+                    notJoinedChannels.push(channel);
+                }
+            }).catch(err => console.log("Error:", err.message))
+        );
 
-            let status = response.data.result.status;
-            if (status === "left" || status === "kicked") {
-                notJoinedChannels.push(channel);
-            }
-        }
+        await Promise.all(checkPromises); // Wait for all requests to complete
 
         if (notJoinedChannels.length === 0) {
             return res.json({ status: "true", is_joined: true });
@@ -44,7 +42,7 @@ app.get("/check-membership", async (req, res) => {
             });
         }
     } catch (error) {
-        console.error("Error checking channels:", error.response ? error.response.data : error.message);
+        console.error("Error checking channels:", error.message);
         return res.json({ status: "error", message: "Failed to check channels" });
     }
 });
